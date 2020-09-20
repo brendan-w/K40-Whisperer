@@ -1745,7 +1745,7 @@ class Application(Frame):
         else:
             default_types = design_types
         
-        fileselect = askopenfilename(filetypes=[default_types,
+        fileselect = askopenfilename(filetypes=[design_types,
                                             ("G-Code Files ", ("*.ngc","*.gcode","*.g","*.tap")),\
                                             ("DXF Files ","*.dxf"),\
                                             ("SVG Files ","*.svg"),\
