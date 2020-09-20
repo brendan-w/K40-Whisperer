@@ -188,6 +188,8 @@ def isColor(c):
         return True
     if c.lower() in svgcolors.keys():
         return True
+    if c.startswith('rgb('):
+        return True
     #might be "none" or some undefined color constant or rgb()
     #however, rgb() shouldnt occur at this point
     return False
