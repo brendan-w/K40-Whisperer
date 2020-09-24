@@ -5729,7 +5729,7 @@ app = Application(root)
 app.master.title(title_text)
 app.master.iconname("K40")
 app.master.minsize(800,560)
-app.master.geometry("800x560")
+app.master.geometry("1400x850")
 try:
     try:
         import tkFont
