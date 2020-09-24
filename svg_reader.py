@@ -702,6 +702,21 @@ class SVG_READER(inkex.Effect):
                     pass
                 error_text = "%s" %(e)
                 raise Exception("Inkscape Execution Failed (while making raster data).\n%s" %(error_text))
+        elif os.path.exists('/usr/bin/convert'):
+            try:
+                svg_temp_file = os.path.join(tmp_dir, "k40w_temp.svg")
+                png_temp_file = os.path.join(tmp_dir, "k40w_image.png")
+                self.document.write(svg_temp_file)
+                run_external(['/usr/bin/convert', "-background", "white", "-density", str(self.image_dpi), svg_temp_file, png_temp_file], self.timout)
+                self.raster_PIL = Image.open(png_temp_file)
+                self.raster_PIL = self.raster_PIL.convert("L")
+            except Exception as e:
+                try:
+                    shutil.rmtree(tmp_dir)
+                except:
+                    pass
+                error_text = "%s" %(e)
+                raise Exception("Inkscape Execution Failed (while making raster data).\n%s" %(error_text))
         else:
             raise Exception("Inkscape Not found.")
         try:
