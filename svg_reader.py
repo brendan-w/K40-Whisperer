@@ -860,21 +860,34 @@ class SVG_READER(inkex.Effect):
 
         
         #################################################
-        xmin= 0.0
-        xmax=  w_mm 
-        ymin= -h_mm 
-        ymax= 0.0
+
+        # crude auto-resizing to the bounding box of the vector data
+        # NOTE: Only using the first point
+        get_vertex_index = lambda i, lines: {line[i] for line in lines if self.Cut_Type[line[5]] in ("engrave", "cut") }
+        x_coords_mm = set()
+        x_coords_mm = x_coords_mm.union(get_vertex_index(0, self.lines))
+        x_coords_mm = x_coords_mm.union(get_vertex_index(2, self.lines))
+
+        y_coords_mm = set()
+        y_coords_mm = y_coords_mm.union(get_vertex_index(1, self.lines))
+        y_coords_mm = y_coords_mm.union(get_vertex_index(3, self.lines))
+
+        if x_coords_mm and y_coords_mm:
+            actual_width = max(x_coords_mm) - min(x_coords_mm)
+            actual_height = max(y_coords_mm) - min(y_coords_mm)
+            # y-axis is inverted (origin is at the bottom), and we'll get out-of-bounds errors if we don't correct for the new size
+            for line in self.lines:
+                line[1] = line[1] - (h_mm - actual_height)
+                line[3] = line[3] - (h_mm - actual_height)
+
+            w_mm = actual_width
+            h_mm = actual_height
+        # end crudeness
+
+        self.Xsize=w_mm
+        self.Ysize=h_mm
+
         self.Make_PNG()
-        
-        self.Xsize=xmax-xmin
-        self.Ysize=ymax-ymin
-        Xcorner=xmin
-        Ycorner=ymax
-        for ii in range(len(self.lines)):
-            self.lines[ii][0] = self.lines[ii][0]-Xcorner
-            self.lines[ii][1] = self.lines[ii][1]-Ycorner
-            self.lines[ii][2] = self.lines[ii][2]-Xcorner
-            self.lines[ii][3] = self.lines[ii][3]-Ycorner
 
         self.cut_lines = []
         self.eng_lines = []
