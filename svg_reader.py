@@ -32,7 +32,7 @@ import cubicsuperpath
 import cspsubdiv
 import traceback
 
-from PIL import Image
+from PIL import Image, ImageOps
 Image.MAX_IMAGE_PIXELS = None
 
 from lxml import etree
@@ -857,24 +857,122 @@ class SVG_READER(inkex.Effect):
                           [0.0  , -scale_h, h_mm+Dy]]]
 
         self.process_group(self.document.getroot())
-
         
-        #################################################
-        xmin= 0.0
-        xmax=  w_mm 
-        ymin= -h_mm 
-        ymax= 0.0
         self.Make_PNG()
-        
-        self.Xsize=xmax-xmin
-        self.Ysize=ymax-ymin
-        Xcorner=xmin
-        Ycorner=ymax
-        for ii in range(len(self.lines)):
-            self.lines[ii][0] = self.lines[ii][0]-Xcorner
-            self.lines[ii][1] = self.lines[ii][1]-Ycorner
-            self.lines[ii][2] = self.lines[ii][2]-Xcorner
-            self.lines[ii][3] = self.lines[ii][3]-Ycorner
+
+        #################################################
+        # crude auto-resizing to the bounding box of the actual image/vector data (whichever is bigger)
+        #
+        # NOTE: It's not entirely obvious, but the Y-axis of self.lines is inverted (lower-left
+        #       corner is the origin). When we process the raster image coordinates, we emulate
+        #       this coordinate system to keep everything consistent.
+        #################################################
+
+        def combine_bboxes(a, b):
+            """Returns the outer enclosing extents of a joined bbox, or None, if neither input bbox is present"""
+            if a is None:
+                return b
+            elif b is None:
+                return a
+            return (min(a[0], b[0]), # X min
+                    min(a[1], b[1]), # Y min
+                    max(a[2], b[2]), # X max
+                    max(a[3], b[3])) # Y max
+
+        def scale_bbox(bbox, x_factor, y_factor):
+            if bbox is None:
+                return None;
+            return (bbox[0] * x_factor,
+                    bbox[1] * y_factor,
+                    bbox[2] * x_factor,
+                    bbox[3] * y_factor)
+
+        def translate_bbox(bbox, x_offset, y_offset):
+            if bbox is None:
+                return None;
+            return (bbox[0] + x_offset,
+                    bbox[1] + y_offset,
+                    bbox[2] + x_offset,
+                    bbox[3] + y_offset)
+
+        def flip_y(bbox, height):
+            """Function to convert back/forth between the flipped Y axis and a "normal" Y-axis.
+               Moves the Y-origin from the top to the bottom, or vice-versa.
+            """
+            bbox = translate_bbox(scale_bbox(bbox, 1.0, -1.0), 0, height)
+            # now that the coordinates are inverted, Y-min and Y-max are swapped
+            return (bbox[0],
+                    bbox[3], # swapped
+                    bbox[2],
+                    bbox[1])  # swapped
+
+        def crop_image(pil_image, dpi, bbox):
+            """Wrapper around Image.crop() that accepts the Y-invert-mm coordiante frame"""
+            # convert back to pixels and then flip the Y-axis to put the origin back in the top left.
+            dpmm = (dpi / 25.4)
+            width_px, height_px = pil_image.size
+            pixel_bbox = flip_y(scale_bbox(bbox, dpmm, dpmm), height_px)
+            return pil_image.crop(pixel_bbox)
+
+
+        def get_raster_bbox(pil_image, dpi):
+            """Returns the bounding box of the raster image in Y-inverted mm (same coordinate frame as self.lines)"""
+
+            # Invert the pixel colors of the image, and get the non-zero pixel bounding box.
+            pixel_bbox = ImageOps.invert(pil_image).getbbox()
+
+            # getbbox() will return None if the entire image is black, and there is no bounding box
+            if pixel_bbox is None:
+                return None
+
+
+            # Handle the weird Y-inverted coordinate frame in pixel coordinates, and then convert to mm
+            mmpd = (25.4 / dpi)
+            width_px, height_px = pil_image.size
+            return scale_bbox(flip_y(pixel_bbox, height_px), mmpd, mmpd)
+
+
+        def get_line_bbox(lines):
+            """Returns the min and max corners of the bounding box in mm, or None if there is no bounding box"""
+            get_vertex_index = lambda i: {line[i] for line in lines if self.Cut_Type[line[5]] in ("engrave", "cut") }
+            x_coords_mm = set()
+            x_coords_mm = x_coords_mm.union(get_vertex_index(0))
+            x_coords_mm = x_coords_mm.union(get_vertex_index(2))
+
+            y_coords_mm = set()
+            y_coords_mm = y_coords_mm.union(get_vertex_index(1))
+            y_coords_mm = y_coords_mm.union(get_vertex_index(3))
+
+            if x_coords_mm and y_coords_mm:
+                return (min(x_coords_mm), min(y_coords_mm), max(x_coords_mm), max(y_coords_mm))
+            return None
+
+        # NOTE: These bboxes are in the strange Y-inverted format.
+        raster_bbox = get_raster_bbox(self.raster_PIL, self.image_dpi)
+        line_bbox = get_line_bbox(self.lines)
+
+        combined_bbox = combine_bboxes(raster_bbox, line_bbox)
+
+        # if we have a bbox, crop everything to the minimum size
+        if combined_bbox:
+            w_mm = combined_bbox[2] - combined_bbox[0]
+            h_mm = combined_bbox[3] - combined_bbox[1]
+
+            self.raster_PIL = crop_image(self.raster_PIL, self.image_dpi, combined_bbox)
+
+            # top-left justify the vector content
+            for line in self.lines:
+                line[0] = line[0] - combined_bbox[0]  # X min
+                line[2] = line[2] - combined_bbox[0]
+                line[1] = line[1] - combined_bbox[1]  # Y min
+                line[3] = line[3] - combined_bbox[1]
+
+        #################################################
+        # end crudeness
+        #################################################
+
+        self.Xsize=w_mm
+        self.Ysize=h_mm
 
         self.cut_lines = []
         self.eng_lines = []
