@@ -32,7 +32,7 @@ import cubicsuperpath
 import cspsubdiv
 import traceback
 
-from PIL import Image
+from PIL import Image, ImageOps
 Image.MAX_IMAGE_PIXELS = None
 
 from lxml import etree
@@ -712,7 +712,8 @@ class SVG_READER(inkex.Effect):
                 self.raster_PIL = self.raster_PIL.convert("L")
             except Exception as e:
                 try:
-                    shutil.rmtree(tmp_dir)
+                    pass
+                    # shutil.rmtree(tmp_dir)
                 except:
                     pass
                 error_text = "%s" %(e)
@@ -861,8 +862,15 @@ class SVG_READER(inkex.Effect):
         
         #################################################
 
-        # crude auto-resizing to the bounding box of the vector data
-        # NOTE: Only using the first point
+        # crude auto-resizing to the bounding box of the actual image/vector data (whichever is bigger)
+        actual_width = 0
+        actual_height = 0
+
+        self.Make_PNG()
+
+        inv_raster = ImageOps.invert(self.raster_PIL)
+        print(inv_raster.getbbox())
+
         get_vertex_index = lambda i, lines: {line[i] for line in lines if self.Cut_Type[line[5]] in ("engrave", "cut") }
         x_coords_mm = set()
         x_coords_mm = x_coords_mm.union(get_vertex_index(0, self.lines))
@@ -875,19 +883,25 @@ class SVG_READER(inkex.Effect):
         if x_coords_mm and y_coords_mm:
             actual_width = max(x_coords_mm) - min(x_coords_mm)
             actual_height = max(y_coords_mm) - min(y_coords_mm)
-            # y-axis is inverted (origin is at the bottom), and we'll get out-of-bounds errors if we don't correct for the new size
-            for line in self.lines:
-                line[1] = line[1] - (h_mm - actual_height)
-                line[3] = line[3] - (h_mm - actual_height)
 
-            w_mm = actual_width
-            h_mm = actual_height
+        print(min(x_coords_mm), max(x_coords_mm))
+        print(min(y_coords_mm), max(y_coords_mm))
+
+        # top-left justify the content
+        for line in self.lines:
+            line[0] = line[0] - min(x_coords_mm)
+            line[2] = line[2] - min(x_coords_mm)
+
+            # NOTE: y-axis is inverted (origin is at the bottom), and we'll get out-of-bounds errors if we don't correct for the new size
+            line[1] = line[1] - min(y_coords_mm)
+            line[3] = line[3] - min(y_coords_mm)
+
+        w_mm = actual_width
+        h_mm = actual_height
         # end crudeness
 
         self.Xsize=w_mm
         self.Ysize=h_mm
-
-        self.Make_PNG()
 
         self.cut_lines = []
         self.eng_lines = []
