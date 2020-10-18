@@ -1731,7 +1731,7 @@ class Application(Frame):
     def menu_File_Open_Design(self,event=None):
         if self.GUI_Disabled:
             return
-        init_dir = os.path.dirname(self.DESIGN_FILE)
+        init_dir = "/mnt/cutfiles"
         if ( not os.path.isdir(init_dir) ):
             init_dir = self.HOME_DIR
 
