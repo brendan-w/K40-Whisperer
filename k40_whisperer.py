@@ -206,6 +206,8 @@ class Application(Frame):
         self.include_Gcde = BooleanVar()
         self.include_Time = BooleanVar()
 
+        self.compute_raster = BooleanVar()
+
         self.advanced = BooleanVar()
         
         self.halftone     = BooleanVar()
@@ -504,7 +506,8 @@ class Application(Frame):
 
         self.Open_Button       = Button(self.master,text="Open\nDesign File",   command=self.menu_File_Open_Design)
         self.Reload_Button     = Button(self.master,text="Reload\nDesign File", command=self.menu_Reload_Design)
-        
+        self.Compute_Raster     = Checkbutton(self.master, text="Computer Raster On Load", variable=self.compute_raster)
+
         self.Home_Button       = Button(self.master,text="Home",            command=self.Home)
         self.UnLock_Button     = Button(self.master,text="Unlock Rail",     command=self.Unlock)
         self.Stop_Button       = Button(self.master,text="Pause/Stop",      command=self.Stop)
@@ -1944,7 +1947,7 @@ class Application(Frame):
             try:
                 try:
                     svg_reader.parse_svg(self.SVG_FILE)
-                    svg_reader.make_paths()
+                    svg_reader.make_paths(make_png=self.compute_raster.get())
                 except SVG_PXPI_EXCEPTION as e:
                     pxpi_dialog = pxpiDialog(root,
                                            self.units.get(),
@@ -1960,7 +1963,7 @@ class Application(Frame):
                     dialog_pxpi,dialog_viewbox = pxpi_dialog.result
                     svg_reader.parse_svg(self.SVG_FILE)
                     svg_reader.set_size(dialog_pxpi,dialog_viewbox)
-                    svg_reader.make_paths()
+                    svg_reader.make_paths(make_png=self.compute_raster.get())
                     
             except SVG_TEXT_EXCEPTION as e:
                 svg_reader = SVG_READER()
@@ -1970,7 +1973,7 @@ class Application(Frame):
                 svg_reader.parse_svg(self.SVG_FILE)
                 if dialog_pxpi != None and dialog_viewbox != None:
                     svg_reader.set_size(dialog_pxpi,dialog_viewbox)
-                svg_reader.make_paths(txt2paths=True)
+                svg_reader.make_paths(txt2paths=True, make_png=self.compute_raster.get())
                 
         except Exception as e:
             msg1 = "SVG file load failed: "
@@ -3934,6 +3937,10 @@ class Application(Frame):
                 self.Reload_Button.place(x=12+100, y=Yloc, width=100, height=40)                
                 if h>=560:
                     Yloc=Yloc+50
+
+                    self.Compute_Raster.place(x=12, y=Yloc, width=200, height=20)
+                    Yloc=Yloc+30
+
                     self.separator1.place(x=x_label_L, y=Yloc,width=w_label+75+40, height=2)
                     Yloc=Yloc+6
                     self.Label_Position_Control.place(x=x_label_L, y=Yloc, width=w_label*2, height=21)

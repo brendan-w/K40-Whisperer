@@ -785,11 +785,11 @@ class SVG_READER(inkex.Effect):
         self.document.getroot().set('viewBox', '%f %f %f %f' %(viewbox[0],viewbox[1],viewbox[2],viewbox[3]))
 
         
-    def make_paths(self, txt2paths=False ):
+    def make_paths(self, txt2paths=False, make_png=False):
         self.txt2paths = txt2paths
         msg               = ""
 
-        if (self.txt2paths):
+        if (self.txt2paths and make_png):
             self.convert_text2paths()
       
         #################
@@ -858,7 +858,15 @@ class SVG_READER(inkex.Effect):
 
         self.process_group(self.document.getroot())
         
-        self.Make_PNG()
+        if make_png:
+            self.Make_PNG()
+        else:
+            # create an empty white background
+            dpmm = (self.image_dpi / 25.4)
+            self.raster_PIL = Image.new(mode='L',
+                                        size=(int(math.ceil(w_mm*dpmm)), int(math.ceil(h_mm*dpmm))),
+                                        color=255)
+
 
         #################################################
         # crude auto-resizing to the bounding box of the actual image/vector data (whichever is bigger)
